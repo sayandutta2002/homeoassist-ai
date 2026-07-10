@@ -1,0 +1,36 @@
+{
+  "rewrites": [
+    {
+      "source": "/auth/:path*",
+      "destination": "https://homeoassist-ai.onrender.com/auth/:path*"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "https://homeoassist-ai.onrender.com/admin/:path*"
+    },
+    {
+      "source": "/consultation/:path*",
+      "destination": "https://homeoassist-ai.onrender.com/consultation/:path*"
+    },
+    {
+      "source": "/search/:path*",
+      "destination": "https://homeoassist-ai.onrender.com/search/:path*"
+    },
+    {
+      "source": "/triage/:path*",
+      "destination": "https://homeoassist-ai.onrender.com/triage/:path*"
+    },
+    {
+      "source": "/ecommerce/:path*",
+      "destination": "https://homeoassist-ai.onrender.com/ecommerce/:path*"
+    },
+    {
+      "source": "/dashboard/:path*",
+      "destination": "https://homeoassist-ai.onrender.com/dashboard/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
