@@ -321,7 +321,7 @@ export default function Login() {
                   </button>
                 </form>
                 <div className="mt-lg pt-md border-t border-outline-variant/30 text-center bg-surface-container-low p-md rounded-lg">
-                  <Link className="text-label-md font-label-md text-primary hover:underline flex items-center justify-center gap-xs font-bold" to="#">
+                  <Link className="text-label-md font-label-md text-primary hover:underline flex items-center justify-center gap-xs font-bold" to="/onboarding">
                     <UserPlus className="w-5 h-5" />
                     New Practitioner? Apply for Verification.
                   </Link>
