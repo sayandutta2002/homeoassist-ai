@@ -1,13 +1,122 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Activity, Smartphone, IdCard, Lock, LogIn, UserPlus } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Activity, Smartphone, Mail, Lock, LogIn, UserPlus, ShieldCheck, User } from 'lucide-react';
 
 export default function Login() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'patient' | 'doctor'>('patient');
+
+  // Patient State
+  const [patientStep, setPatientStep] = useState<'phone' | 'otp' | 'register'>('phone');
+  const [mobile, setMobile] = useState('');
+  const [otp, setOtp] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+
+  // Doctor State
+  const [doctorEmail, setDoctorEmail] = useState('');
+  const [doctorPassword, setDoctorPassword] = useState('');
+
+  const handleSendOtp = async () => {
+    try {
+      const res = await fetch('/auth/send-mobile-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile })
+      });
+      if (res.ok) {
+        setPatientStep('otp');
+      } else {
+        alert('Failed to send OTP');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error sending OTP');
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    try {
+      const res = await fetch('/auth/verify-mobile-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, otp })
+      });
+      if (res.ok) {
+        // Attempt login
+        const loginRes = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username: mobile, password: '' })
+        });
+        if (loginRes.ok) {
+          navigate('/dashboard'); // or wherever
+        } else {
+          // If login fails, user might not be registered
+          setPatientStep('register');
+        }
+      } else {
+        alert('Invalid OTP');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error verifying OTP');
+    }
+  };
+
+  const handlePatientRegister = async () => {
+    try {
+      const res = await fetch('/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: fullName,
+          mobile,
+          email, // optional
+          role: 'patient'
+        })
+      });
+      if (res.ok) {
+        // Attempt login again
+        const loginRes = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ username: mobile, password: '' })
+        });
+        if (loginRes.ok) {
+          navigate('/dashboard');
+        } else {
+          alert('Login failed after registration');
+        }
+      } else {
+        alert('Registration failed');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error during registration');
+    }
+  };
+
+  const handleDoctorLogin = async () => {
+    try {
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: doctorEmail, password: doctorPassword })
+      });
+      if (res.ok) {
+        navigate('/dashboard');
+      } else {
+        alert('Login failed');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error during login');
+    }
+  };
 
   return (
     <div className="bg-background text-on-background min-h-screen flex flex-col font-body-lg antialiased">
-      {/* TopNavBar Suppressed: Linear/Transactional Intent (Login) */}
       {/* Main Content Canvas */}
       <main className="flex-grow flex items-center justify-center p-md md:p-margin relative overflow-hidden">
         {/* Subtle Ambient Background Element */}
@@ -34,7 +143,10 @@ export default function Login() {
                     ? 'bg-surface-container-lowest text-primary border border-outline-variant/20 shadow-sm font-bold bg-primary/10' 
                     : 'text-on-surface-variant hover:text-on-surface font-medium'
                 }`}
-                onClick={() => setActiveTab('patient')}
+                onClick={() => {
+                  setActiveTab('patient');
+                  setPatientStep('phone');
+                }}
               >
                 Patient Portal
               </button>
@@ -54,46 +166,156 @@ export default function Login() {
             {/* Patient View */}
             {activeTab === 'patient' && (
               <div className="block animate-[fadeIn_0.3s_ease-in-out]">
-                <form className="space-y-md">
-                  <div>
-                    <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="mobile">Mobile Number</label>
-                    <div className="relative">
-                      <Smartphone className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
-                      <input className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" id="mobile" placeholder="+1 (555) 000-0000" type="tel" />
+                {patientStep === 'phone' && (
+                  <form className="space-y-md" onSubmit={(e) => { e.preventDefault(); handleSendOtp(); }}>
+                    <div>
+                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="mobile">Mobile Number</label>
+                      <div className="relative">
+                        <Smartphone className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
+                        <input 
+                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                          id="mobile" 
+                          placeholder="+1 (555) 000-0000" 
+                          type="tel" 
+                          value={mobile}
+                          onChange={(e) => setMobile(e.target.value)}
+                          required
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all" type="button">
-                    Send OTP
-                  </button>
-                </form>
-                <p className="mt-lg text-center text-body-sm font-body-sm text-on-surface-variant">
-                  By continuing, you agree to our <Link className="text-primary hover:underline" to="#">Terms of Service</Link> and <Link className="text-primary hover:underline" to="#">Privacy Policy</Link>.
-                </p>
+                    <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all" type="submit">
+                      Send OTP
+                    </button>
+                  </form>
+                )}
+
+                {patientStep === 'otp' && (
+                  <form className="space-y-md" onSubmit={(e) => { e.preventDefault(); handleVerifyOtp(); }}>
+                    <div>
+                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="otp">Enter OTP</label>
+                      <div className="relative">
+                        <ShieldCheck className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
+                        <input 
+                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all tracking-[0.5em] font-mono text-center" 
+                          id="otp" 
+                          placeholder="000000" 
+                          type="text" 
+                          maxLength={6}
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="text-right mt-1">
+                        <button type="button" onClick={() => setPatientStep('phone')} className="text-label-sm text-primary hover:underline">Change Mobile Number</button>
+                      </div>
+                    </div>
+                    <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all" type="submit">
+                      Verify & Login
+                    </button>
+                  </form>
+                )}
+
+                {patientStep === 'register' && (
+                  <form className="space-y-md" onSubmit={(e) => { e.preventDefault(); handlePatientRegister(); }}>
+                    <div className="text-center mb-md">
+                      <p className="text-body-md text-on-surface-variant">Looks like you're new here!</p>
+                      <p className="text-label-md text-on-surface font-medium">Create your patient profile</p>
+                    </div>
+                    <div>
+                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="fullName">Full Name *</label>
+                      <div className="relative">
+                        <User className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
+                        <input 
+                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                          id="fullName" 
+                          placeholder="John Doe" 
+                          type="text" 
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="reg-mobile">Mobile Number *</label>
+                      <div className="relative">
+                        <Smartphone className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
+                        <input 
+                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface opacity-70" 
+                          id="reg-mobile" 
+                          type="tel" 
+                          value={mobile}
+                          disabled
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="email">Email Address (Optional)</label>
+                      <div className="relative">
+                        <Mail className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
+                        <input 
+                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                          id="email" 
+                          placeholder="john@example.com" 
+                          type="email" 
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all" type="submit">
+                      Register & Login
+                    </button>
+                  </form>
+                )}
+                
+                {patientStep === 'phone' && (
+                  <p className="mt-lg text-center text-body-sm font-body-sm text-on-surface-variant">
+                    By continuing, you agree to our <Link className="text-primary hover:underline" to="#">Terms of Service</Link> and <Link className="text-primary hover:underline" to="#">Privacy Policy</Link>.
+                  </p>
+                )}
               </div>
             )}
             
             {/* Doctor View */}
             {activeTab === 'doctor' && (
               <div className="block animate-[fadeIn_0.3s_ease-in-out]">
-                <form className="space-y-md">
+                <form className="space-y-md" onSubmit={(e) => { e.preventDefault(); handleDoctorLogin(); }}>
                   <div>
-                    <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="mrn">Medical Registration Number (MRN)</label>
+                    <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="doc-email">Email Address</label>
                     <div className="relative">
-                      <IdCard className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
-                      <input className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" id="mrn" placeholder="e.g. MED-12345" type="text" />
+                      <Mail className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
+                      <input 
+                        className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                        id="doc-email" 
+                        placeholder="doctor@clinic.com" 
+                        type="email" 
+                        value={doctorEmail}
+                        onChange={(e) => setDoctorEmail(e.target.value)}
+                        required
+                      />
                     </div>
                   </div>
                   <div>
                     <div className="flex justify-between items-center mb-xs">
-                      <label className="block text-label-md font-label-md text-on-surface" htmlFor="password">Secure Password</label>
+                      <label className="block text-label-md font-label-md text-on-surface" htmlFor="doc-password">Secure Password</label>
                       <Link className="text-label-sm font-label-sm text-primary hover:underline" to="#">Forgot Password?</Link>
                     </div>
                     <div className="relative">
                       <Lock className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
-                      <input className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" id="password" placeholder="••••••••" type="password" />
+                      <input 
+                        className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                        id="doc-password" 
+                        placeholder="••••••••" 
+                        type="password" 
+                        value={doctorPassword}
+                        onChange={(e) => setDoctorPassword(e.target.value)}
+                        required
+                      />
                     </div>
                   </div>
-                  <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all flex items-center justify-center gap-xs" type="button">
+                  <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all flex items-center justify-center gap-xs" type="submit">
                     <LogIn className="w-5 h-5" />
                     Secure Login
                   </button>

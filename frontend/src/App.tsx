@@ -8,6 +8,7 @@ import Dashboard from './pages/doctor/Dashboard';
 import ClinicalInterface from './pages/doctor/ClinicalInterface';
 import Ledger from './pages/doctor/Ledger';
 import Telemetry from './pages/admin/Telemetry';
+import PractitionerVerification from './pages/admin/PractitionerVerification';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/doctor/clinical-interface" element={<ClinicalInterface />} />
         <Route path="/doctor/ledger" element={<Ledger />} />
         <Route path="/admin/telemetry" element={<Telemetry />} />
+        <Route path="/admin/verification" element={<PractitionerVerification />} />
       </Routes>
     </BrowserRouter>
   );

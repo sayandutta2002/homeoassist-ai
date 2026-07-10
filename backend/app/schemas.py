@@ -9,18 +9,29 @@ class RoleEnum(str, Enum):
     PATIENT = "patient"
 
 class UserCreate(BaseModel):
-    email: EmailStr
     password: str
     full_name: str
     tenant_name: str # The clinic/practice name
     role: RoleEnum = RoleEnum.DOCTOR
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+
+class OtpRequest(BaseModel):
+    phone_number: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+
+class OtpVerify(BaseModel):
+    ref_id: str
+    otp: str
 
 class UserResponse(BaseModel):
     id: int
-    email: EmailStr
+    email: Optional[EmailStr] = None
     full_name: str
     role: RoleEnum
     tenant_id: int
+    verification_status: str
     
     class Config:
         from_attributes = True

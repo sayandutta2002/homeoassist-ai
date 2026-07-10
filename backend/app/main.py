@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, search, consultation, triage, ecommerce, dashboard, admin
+from app.routers import auth, search, consultation, triage, ecommerce, dashboard, admin, admin_verification
 from app.telemetry import TelemetryMiddleware
 from app import models
 from app.database import engine
@@ -26,6 +26,7 @@ app.add_middleware(
 app.add_middleware(TelemetryMiddleware)
 
 app.include_router(auth.router)
+app.include_router(admin_verification.router)
 app.include_router(search.router)
 app.include_router(consultation.router)
 app.include_router(triage.router)

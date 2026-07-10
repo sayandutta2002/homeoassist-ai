@@ -9,6 +9,11 @@ class RoleEnum(str, enum.Enum):
     DOCTOR = "doctor"
     PATIENT = "patient"
 
+class VerificationStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
 class Tenant(Base):
     __tablename__ = "tenants"
     
@@ -27,10 +32,13 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     app_id = Column(String, index=True, default="homeoassist")
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=True)
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(RoleEnum), default=RoleEnum.DOCTOR, nullable=False)
     full_name = Column(String)
+    phone_number = Column(String, unique=True, index=True, nullable=True)
+    aadhaar_number = Column(String, unique=True, index=True, nullable=True)
+    verification_status = Column(Enum(VerificationStatus), default=VerificationStatus.PENDING, nullable=False)
     
     tenant = relationship("Tenant", back_populates="users")
 
