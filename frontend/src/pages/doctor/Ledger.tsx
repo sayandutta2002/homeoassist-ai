@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const Ledger: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(true);

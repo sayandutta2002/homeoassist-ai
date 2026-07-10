@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Activity, Smartphone, IdCard, Lock, LogIn, UserPlus } from 'lucide-react';
 
