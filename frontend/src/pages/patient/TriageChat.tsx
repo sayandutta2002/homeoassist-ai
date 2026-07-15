@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Globe, Info, ChevronDown, Bot, UserCircle, User, Mic, Send, CheckCircle2
+  Globe, Info, ChevronDown, Bot, UserCircle, Mic, Send, CheckCircle2
 } from 'lucide-react';
 
 export default function TriageChat() {

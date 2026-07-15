@@ -18,12 +18,21 @@ class ConversationalAgent:
     Handles LLM-driven Intelligent Probing using Gemini.
     """
     def __init__(self):
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
+        self.api_key = os.environ.get("GEMINI_API_KEY")
+        if not self.api_key:
             logger.warning("GEMINI_API_KEY environment variable not set. LLM calls will fail.")
-        self.client = genai.Client(api_key=api_key)
+            self.client = None
+        else:
+            self.client = genai.Client(api_key=self.api_key)
 
     def chat_with_patient(self, messages: List[Dict[str, str]]) -> TriageResponse:
+        if not self.client:
+            self.api_key = os.environ.get("GEMINI_API_KEY")
+            if self.api_key:
+                self.client = genai.Client(api_key=self.api_key)
+            else:
+                raise ValueError("GEMINI_API_KEY is missing. Please set it in your environment.")
+        
         system_instruction = (
             "You are HomeoAssist AI, an expert homeopathic triage assistant. "
             "Your job is to ask the patient clarifying questions about their symptoms (modalities, time of day, triggers) "
