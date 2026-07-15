@@ -113,3 +113,13 @@ class MateriaMedicaEntry(Base):
     app_id = Column(String, index=True, default="homeoassist")
     remedy_name = Column(String, nullable=False, index=True)
     content = Column(Text, nullable=False)
+
+class MobileOTP(Base):
+    __tablename__ = "mobile_otps"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    phone_number = Column(String, index=True, nullable=False)
+    otp_code = Column(String, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

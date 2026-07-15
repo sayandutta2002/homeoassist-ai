@@ -86,15 +86,15 @@ async def verify_aadhaar(request: schemas.OtpVerify):
     return {"verified": True, "message": "Aadhaar verified successfully"}
 
 @router.post("/send-mobile-otp")
-async def send_mobile(request: schemas.OtpRequest):
+async def send_mobile(request: schemas.OtpRequest, db: Session = Depends(database.get_db)):
     if not request.phone_number:
         raise HTTPException(status_code=400, detail="Phone number required")
-    ref_id = await send_mobile_otp(request.phone_number)
+    ref_id = await send_mobile_otp(request.phone_number, db)
     return {"ref_id": ref_id, "message": "OTP sent to mobile number"}
 
 @router.post("/verify-mobile-otp")
-async def verify_mobile(request: schemas.OtpVerify):
-    is_valid = await verify_mobile_otp(request.ref_id, request.otp)
+async def verify_mobile(request: schemas.OtpVerify, db: Session = Depends(database.get_db)):
+    is_valid = await verify_mobile_otp(request.ref_id, request.otp, db)
     if not is_valid:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
     return {"verified": True, "message": "Mobile verified successfully"}

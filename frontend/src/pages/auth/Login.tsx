@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Activity, Smartphone, Mail, Lock, LogIn, UserPlus, ShieldCheck, User } from 'lucide-react';
+import { Activity, Smartphone, Mail, Lock, LogIn, UserPlus, ShieldCheck, User, RefreshCw, Clock } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -17,13 +17,38 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [mobileRefId, setMobileRefId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+  const [resendCooldown, setResendCooldown] = useState(30);
+
+  // Timer logic for OTP
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (patientStep === 'otp' && timeLeft > 0) {
+      timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [patientStep, timeLeft]);
+
+  useEffect(() => {
+    let cooldownTimer: NodeJS.Timeout;
+    if (patientStep === 'otp' && resendCooldown > 0) {
+      cooldownTimer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+    }
+    return () => clearTimeout(cooldownTimer);
+  }, [patientStep, resendCooldown]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
 
   // Doctor State
   const [doctorEmail, setDoctorEmail] = useState('');
   const [doctorPassword, setDoctorPassword] = useState('');
 
-  const handleSendOtp = async () => {
-    if (!fullName.trim()) {
+  const handleSendOtp = async (isResend = false) => {
+    if (!fullName.trim() && !isResend) {
       alert("Please enter your full name.");
       return;
     }
@@ -44,6 +69,9 @@ export default function Login() {
         const data = await res.json();
         setMobileRefId(data.ref_id || 'dummy_ref');
         setPatientStep('otp');
+        setTimeLeft(600); // Reset 10m timer
+        setResendCooldown(30); // Reset 30s cooldown
+        setOtp('');
       } else {
         const err = await res.json();
         alert(err.detail || 'Failed to send OTP');
@@ -58,6 +86,11 @@ export default function Login() {
 
   const handleVerifyOtp = async () => {
     if (!otp) return;
+    if (timeLeft === 0) {
+      alert('OTP has expired. Please request a new one.');
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const cleanMobile = mobile.replace(/\D/g, '');
@@ -111,7 +144,7 @@ export default function Login() {
           alert('Login failed');
         }
       } else {
-        alert('Invalid OTP');
+        alert('Invalid or expired OTP');
       }
     } catch (e) {
       console.error(e);
@@ -249,34 +282,53 @@ export default function Login() {
                 )}
 
                 {patientStep === 'otp' && (
-                  <form className="space-y-md" onSubmit={(e) => { e.preventDefault(); handleVerifyOtp(); }}>
+                  <div className="space-y-md animate-[fadeIn_0.3s_ease-in-out]">
                     <div className="text-center mb-md">
                       <p className="text-body-md text-on-surface-variant">We've sent an OTP to</p>
                       <p className="text-label-md text-on-surface font-medium">+91 {mobile}</p>
                     </div>
-                    <div>
-                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="otp">Enter OTP</label>
-                      <div className="relative">
-                        <ShieldCheck className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
-                        <input 
-                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all tracking-[0.5em] font-mono text-center" 
-                          id="otp" 
-                          placeholder="000000" 
-                          type="text" 
-                          maxLength={6}
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                          required
-                        />
+                    
+                    <form onSubmit={(e) => { e.preventDefault(); handleVerifyOtp(); }} className="space-y-md">
+                      <div>
+                        <div className="flex justify-between items-center mb-xs">
+                          <label className="block text-label-md font-label-md text-on-surface" htmlFor="otp">Enter OTP</label>
+                          <span className={`text-label-sm font-mono font-medium flex items-center gap-1 ${timeLeft < 60 ? 'text-error' : 'text-primary'}`}>
+                            <Clock className="w-3 h-3" />
+                            {formatTime(timeLeft)}
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <ShieldCheck className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
+                          <input 
+                            className={`w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 outline-none transition-all tracking-[0.5em] font-mono text-center ${timeLeft === 0 ? 'border-error focus:border-error focus:ring-error/20 bg-error-container/10' : 'border-outline-variant focus:border-primary focus:ring-primary/20'}`} 
+                            id="otp" 
+                            placeholder="000000" 
+                            type="text" 
+                            maxLength={6}
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                            disabled={timeLeft === 0}
+                            required
+                          />
+                        </div>
+                        <div className="flex justify-between items-center mt-2">
+                          <button 
+                            type="button" 
+                            onClick={() => handleSendOtp(true)} 
+                            disabled={resendCooldown > 0 || isLoading}
+                            className={`text-label-sm flex items-center gap-1 transition-colors ${resendCooldown > 0 ? 'text-on-surface-variant/50 cursor-not-allowed' : 'text-primary hover:underline'}`}
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+                            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
+                          </button>
+                          <button type="button" onClick={() => setPatientStep('phone')} className="text-label-sm text-on-surface-variant hover:text-primary hover:underline">Change Number</button>
+                        </div>
                       </div>
-                      <div className="text-right mt-1">
-                        <button type="button" onClick={() => setPatientStep('phone')} className="text-label-sm text-primary hover:underline">Change details</button>
-                      </div>
-                    </div>
-                    <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all disabled:opacity-50" type="submit" disabled={isLoading}>
-                      {isLoading ? 'Verifying...' : 'Verify & Login'}
-                    </button>
-                  </form>
+                      <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all disabled:opacity-50" type="submit" disabled={isLoading || timeLeft === 0 || otp.length !== 6}>
+                        {isLoading ? 'Verifying...' : 'Verify & Login'}
+                      </button>
+                    </form>
+                  </div>
                 )}
                 
                 {patientStep === 'phone' && (
