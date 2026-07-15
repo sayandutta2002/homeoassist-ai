@@ -11,53 +11,106 @@ export default function Login() {
 
   // Patient State
   const [patientStep, setPatientStep] = useState<'phone' | 'otp' | 'register'>('phone');
+  // Patient State
+  const [patientStep, setPatientStep] = useState<'phone' | 'otp'>('phone');
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [mobileRefId, setMobileRefId] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // Doctor State
   const [doctorEmail, setDoctorEmail] = useState('');
   const [doctorPassword, setDoctorPassword] = useState('');
 
   const handleSendOtp = async () => {
+    if (!fullName.trim()) {
+      alert("Please enter your full name.");
+      return;
+    }
+    const cleanMobile = mobile.replace(/\D/g, '');
+    if (cleanMobile.length < 10) {
+      alert("Please enter a valid mobile number.");
+      return;
+    }
+    
+    setIsLoading(true);
     try {
       const res = await fetch('/auth/send-mobile-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile })
+        body: JSON.stringify({ phone_number: cleanMobile })
       });
       if (res.ok) {
+        const data = await res.json();
+        setMobileRefId(data.ref_id || 'dummy_ref');
         setPatientStep('otp');
       } else {
-        alert('Failed to send OTP');
+        const err = await res.json();
+        alert(err.detail || 'Failed to send OTP');
       }
     } catch (e) {
       console.error(e);
       alert('Error sending OTP');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleVerifyOtp = async () => {
+    if (!otp) return;
+    setIsLoading(true);
     try {
+      const cleanMobile = mobile.replace(/\D/g, '');
       const res = await fetch('/auth/verify-mobile-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile, otp })
+        body: JSON.stringify({ ref_id: mobileRefId, otp })
       });
+      
       if (res.ok) {
         // Attempt login
-        const loginRes = await fetch('/auth/login', {
+        let loginRes = await fetch('/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ username: mobile, password: '' })
+          body: new URLSearchParams({ username: cleanMobile, password: 'otp_user' })
         });
+        
+        if (!loginRes.ok) {
+          // If login fails, register them in DB automatically
+          const regRes = await fetch('/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              full_name: fullName,
+              phone_number: cleanMobile,
+              email: email || undefined,
+              role: 'patient',
+              password: 'otp_user',
+              tenant_name: 'HomeoAssist Default'
+            })
+          });
+          
+          if (!regRes.ok) {
+            alert('Failed to save profile to database');
+            setIsLoading(false);
+            return;
+          }
+          
+          // Login again after registration
+          loginRes = await fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ username: cleanMobile, password: 'otp_user' })
+          });
+        }
+        
         if (loginRes.ok) {
           localStorage.setItem('role', 'patient');
-          navigate('/triage'); // Redirect patient to triage for now
+          navigate('/triage'); // Redirect patient to AI triage
         } else {
-          // If login fails, user might not be registered
-          setPatientStep('register');
+          alert('Login failed');
         }
       } else {
         alert('Invalid OTP');
@@ -65,44 +118,13 @@ export default function Login() {
     } catch (e) {
       console.error(e);
       alert('Error verifying OTP');
-    }
-  };
-
-  const handlePatientRegister = async () => {
-    try {
-      const res = await fetch('/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          full_name: fullName,
-          mobile,
-          email, // optional
-          role: 'patient'
-        })
-      });
-      if (res.ok) {
-        // Attempt login again
-        const loginRes = await fetch('/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ username: mobile, password: '' })
-        });
-        if (loginRes.ok) {
-          localStorage.setItem('role', 'patient');
-          navigate('/triage');
-        } else {
-          alert('Login failed after registration');
-        }
-      } else {
-        alert('Registration failed');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('Error during registration');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDoctorLogin = async () => {
+    setIsLoading(true);
     try {
       const res = await fetch('/auth/login', {
         method: 'POST',
@@ -113,11 +135,14 @@ export default function Login() {
         localStorage.setItem('role', 'doctor');
         navigate('/doctor/dashboard');
       } else {
-        alert('Login failed');
+        const err = await res.json();
+        alert(err.detail || 'Login failed');
       }
     } catch (e) {
       console.error(e);
       alert('Error during login');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -175,28 +200,62 @@ export default function Login() {
                 {patientStep === 'phone' && (
                   <form className="space-y-md" onSubmit={(e) => { e.preventDefault(); handleSendOtp(); }}>
                     <div>
-                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="mobile">Mobile Number</label>
+                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="fullName">Full Name *</label>
+                      <div className="relative">
+                        <User className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
+                        <input 
+                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                          id="fullName" 
+                          placeholder="e.g. John Doe" 
+                          type="text" 
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="mobile">Mobile Number *</label>
                       <div className="relative">
                         <Smartphone className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
                         <input 
                           className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
                           id="mobile" 
-                          placeholder="+1 (555) 000-0000" 
+                          placeholder="Enter 10-digit mobile number" 
                           type="tel" 
                           value={mobile}
-                          onChange={(e) => setMobile(e.target.value)}
+                          onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
+                          maxLength={10}
                           required
                         />
                       </div>
                     </div>
-                    <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all" type="submit">
-                      Send OTP
+                    <div>
+                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="email">Email Address (Optional)</label>
+                      <div className="relative">
+                        <Mail className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
+                        <input 
+                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                          id="email" 
+                          placeholder="e.g. john@example.com" 
+                          type="email" 
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all disabled:opacity-50" type="submit" disabled={isLoading}>
+                      {isLoading ? 'Sending OTP...' : 'Send OTP'}
                     </button>
                   </form>
                 )}
 
                 {patientStep === 'otp' && (
                   <form className="space-y-md" onSubmit={(e) => { e.preventDefault(); handleVerifyOtp(); }}>
+                    <div className="text-center mb-md">
+                      <p className="text-body-md text-on-surface-variant">We've sent an OTP to</p>
+                      <p className="text-label-md text-on-surface font-medium">+91 {mobile}</p>
+                    </div>
                     <div>
                       <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="otp">Enter OTP</label>
                       <div className="relative">
@@ -208,70 +267,16 @@ export default function Login() {
                           type="text" 
                           maxLength={6}
                           value={otp}
-                          onChange={(e) => setOtp(e.target.value)}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                           required
                         />
                       </div>
                       <div className="text-right mt-1">
-                        <button type="button" onClick={() => setPatientStep('phone')} className="text-label-sm text-primary hover:underline">Change Mobile Number</button>
+                        <button type="button" onClick={() => setPatientStep('phone')} className="text-label-sm text-primary hover:underline">Change details</button>
                       </div>
                     </div>
-                    <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all" type="submit">
-                      Verify & Login
-                    </button>
-                  </form>
-                )}
-
-                {patientStep === 'register' && (
-                  <form className="space-y-md" onSubmit={(e) => { e.preventDefault(); handlePatientRegister(); }}>
-                    <div className="text-center mb-md">
-                      <p className="text-body-md text-on-surface-variant">Looks like you're new here!</p>
-                      <p className="text-label-md text-on-surface font-medium">Create your patient profile</p>
-                    </div>
-                    <div>
-                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="fullName">Full Name *</label>
-                      <div className="relative">
-                        <User className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
-                        <input 
-                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
-                          id="fullName" 
-                          placeholder="John Doe" 
-                          type="text" 
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="reg-mobile">Mobile Number *</label>
-                      <div className="relative">
-                        <Smartphone className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
-                        <input 
-                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface opacity-70" 
-                          id="reg-mobile" 
-                          type="tel" 
-                          value={mobile}
-                          disabled
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-label-md font-label-md text-on-surface mb-xs" htmlFor="email">Email Address (Optional)</label>
-                      <div className="relative">
-                        <Mail className="absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant w-5 h-5" />
-                        <input 
-                          className="w-full pl-[44px] pr-sm py-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
-                          id="email" 
-                          placeholder="john@example.com" 
-                          type="email" 
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all" type="submit">
-                      Register & Login
+                    <button className="w-full bg-primary hover:bg-on-primary-fixed-variant text-on-primary py-sm rounded-lg text-label-md font-label-md shadow-[0px_4px_12px_rgba(15,23,42,0.05)] transition-all disabled:opacity-50" type="submit" disabled={isLoading}>
+                      {isLoading ? 'Verifying...' : 'Verify & Login'}
                     </button>
                   </form>
                 )}
