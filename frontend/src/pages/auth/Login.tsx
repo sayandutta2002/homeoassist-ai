@@ -10,8 +10,6 @@ export default function Login() {
   );
 
   // Patient State
-  const [patientStep, setPatientStep] = useState<'phone' | 'otp' | 'register'>('phone');
-  // Patient State
   const [patientStep, setPatientStep] = useState<'phone' | 'otp'>('phone');
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
