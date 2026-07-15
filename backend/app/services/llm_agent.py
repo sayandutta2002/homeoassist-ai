@@ -1,35 +1,52 @@
+import os
 import logging
-from typing import Dict, Any
+from typing import List, Dict, Any
+from pydantic import BaseModel, Field
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
+class TriageResponse(BaseModel):
+    response: str = Field(description="The response to the patient. If is_complete is True, this should be a polite wrap-up message.")
+    is_complete: bool = Field(description="True if enough information has been gathered and triage is complete, False otherwise.")
+    assigned_doctor_id: int | None = Field(description="ID of the doctor to assign (1 for default), only if is_complete is True.")
+    primary_complaint: str | None = Field(description="The summarized primary complaint, only if is_complete is True.")
+
 class ConversationalAgent:
     """
-    Handles Multilingual Speech-to-Text (STT) and LLM-driven Intelligent Probing.
+    Handles LLM-driven Intelligent Probing using Gemini.
     """
     def __init__(self):
-        # Initialize LLM client (e.g., OpenAI/Anthropic)
-        pass
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            logger.warning("GEMINI_API_KEY environment variable not set. LLM calls will fail.")
+        self.client = genai.Client(api_key=api_key)
 
-    def transcribe_audio(self, audio_data: bytes, language: str = "en") -> str:
-        """Mock STT processing for English, Hindi, and Bengali."""
-        # Integrates with Whisper or Azure Speech
-        logger.info(f"Transcribing audio in language: {language}")
-        return "Patient reported sudden onset of severe headache."
-
-    def generate_probing_question(self, current_symptoms: str) -> str:
-        """
-        Uses LLM to dynamically ask follow-up questions regarding modalities.
-        """
-        # Mock LLM logic
-        if "headache" in current_symptoms.lower():
-            return "Does light or noise make your headache worse?"
-        return "Can you tell me what time of day your symptoms are most intense?"
+    def chat_with_patient(self, messages: List[Dict[str, str]]) -> TriageResponse:
+        system_instruction = (
+            "You are HomeoAssist AI, an expert homeopathic triage assistant. "
+            "Your job is to ask the patient clarifying questions about their symptoms (modalities, time of day, triggers) "
+            "to gather a complete picture for the doctor. "
+            "Keep your questions empathetic, concise, and focused on gathering medical history. "
+            "Do NOT ask too many questions at once; ask one clarifying question at a time. "
+            "Once you feel you have gathered enough information (typically 3-5 exchanges), "
+            "set is_complete to True, assign doctor_id to 1, and summarize the primary_complaint."
+        )
         
-    def summarize_intake(self, conversation_history: list) -> Dict[str, Any]:
-        """Summarizes chat history into a structured Intake Profile for the doctor."""
-        return {
-            "primary_complaint": "Severe Headache",
-            "modalities": {"worse": ["Light", "Noise"], "better": ["Pressure"]},
-            "recommended_rubrics": ["Head - Pain - throbbing - light agg."]
-        }
+        contents = []
+        for msg in messages:
+            role = "user" if msg["role"] == "user" else "model"
+            contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
+            
+        response = self.client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                response_mime_type="application/json",
+                response_schema=TriageResponse,
+                temperature=0.2,
+            )
+        )
+        return response.parsed

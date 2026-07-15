@@ -16,29 +16,22 @@ class TriageRequest(BaseModel):
     messages: List[ChatMessage]
     language: str = "en"
 
+from app.services.llm_agent import ConversationalAgent
+
+agent = ConversationalAgent()
+
 @router.post("/chat")
 async def chat_with_triage(request: TriageRequest):
-    # Simulate LLM delay
-    time.sleep(1)
+    # Convert request messages to dict format expected by agent
+    messages_dict = [{"role": m.role, "content": m.content} for m in request.messages]
     
-    # Mock LLM Response Logic
-    last_msg = request.messages[-1].content.lower()
-    
-    if "headache" in last_msg:
+    # Call the Gemini LLM agent
+    try:
+        triage_response = agent.chat_with_patient(messages_dict)
+        return triage_response.dict()
+    except Exception as e:
         return {
-            "response": "I understand you have a headache. Does the headache feel better with cold application or warm application?",
-            "is_complete": False
-        }
-    elif "cold" in last_msg or "warm" in last_msg:
-        return {
-            "response": "Thank you for the details. Based on your symptoms, I am routing you to Dr. Sharma, our senior homeopathic specialist.",
-            "is_complete": True,
-            "assigned_doctor_id": 1,
-            "primary_complaint": "Neurology"
-        }
-    else:
-        return {
-            "response": "Could you provide more specific details about how you are feeling? What makes it better or worse?",
+            "response": "I apologize, but I am experiencing technical difficulties. Please try again.",
             "is_complete": False
         }
 
