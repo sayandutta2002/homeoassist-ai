@@ -3,6 +3,10 @@ import uuid
 import httpx
 from fastapi import HTTPException
 import logging
+from sqlalchemy.orm import Session
+from .. import models
+from datetime import datetime, timedelta
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +16,9 @@ CASHFREE_CLIENT_ID = os.getenv("CASHFREE_CLIENT_ID")
 CASHFREE_CLIENT_SECRET = os.getenv("CASHFREE_CLIENT_SECRET")
 CASHFREE_BASE_URL = "https://api.cashfree.com/verification/aadhaar"
 
-MSG91_AUTH_KEY = os.getenv("MSG91_AUTH_KEY")
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
 
 async def send_aadhaar_otp(aadhaar_number: str) -> str:
     """
@@ -62,15 +68,10 @@ async def verify_aadhaar_otp(ref_id: str, otp: str) -> bool:
             logger.error(f"Cashfree API Error: {str(e)}")
             return False
 
-from sqlalchemy.orm import Session
-from .. import models
-from datetime import datetime, timedelta
-import random
-
 async def send_mobile_otp(phone_number: str, db: Session) -> str:
     """
     Generates a secure OTP, saves it in the database with a 10-minute expiry,
-    and calls MSG91 to send the SMS.
+    and calls Twilio to send the SMS.
     """
     # 1. Generate Secure 6-digit OTP
     otp_code = str(random.randint(100000, 999999))
@@ -88,30 +89,39 @@ async def send_mobile_otp(phone_number: str, db: Session) -> str:
     
     ref_id = str(new_otp.id)
 
-    # 3. Send SMS via MSG91
-    if not MSG91_AUTH_KEY:
+    # 3. Format Phone Number (Twilio requires E.164 format, e.g., +91 for India)
+    formatted_phone = phone_number
+    if len(phone_number) == 10:
+        formatted_phone = f"+91{phone_number}"
+    elif not phone_number.startswith('+'):
+        formatted_phone = f"+{phone_number}"
+
+    # 4. Send SMS via Twilio
+    if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN or not TWILIO_PHONE_NUMBER:
         # Fallback for development without API key
         logger.info(f"========== DEVELOPMENT OTP ==========")
-        logger.info(f"Phone: {phone_number}")
+        logger.info(f"Phone: {formatted_phone}")
         logger.info(f"Code: {otp_code}")
         logger.info(f"=====================================")
         return ref_id
         
     try:
         async with httpx.AsyncClient() as client:
-            url = "https://control.msg91.com/api/v5/otp"
-            params = {
-                "mobile": phone_number,
-                "otp": otp_code,
-                "authkey": MSG91_AUTH_KEY,
-                "invisible": "1", # Use custom OTP instead of their auto-generation
-                "template_id": "YOUR_TEMPLATE_ID" # Will need to be set properly in prod
+            url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_ACCOUNT_SID}/Messages.json"
+            data = {
+                "To": formatted_phone,
+                "From": TWILIO_PHONE_NUMBER,
+                "Body": f"Your HomeoAssist verification code is: {otp_code}. It is valid for 10 minutes."
             }
-            response = await client.post(url, params=params)
+            response = await client.post(
+                url,
+                data=data,
+                auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            )
             response.raise_for_status()
-            logger.info(f"MSG91 SMS sent to {phone_number}")
+            logger.info(f"Twilio SMS sent successfully to {formatted_phone}")
     except Exception as e:
-        logger.error(f"Failed to send SMS via MSG91: {e}")
+        logger.error(f"Failed to send SMS via Twilio: {e}")
         # Even if SMS fails, we still return the ref_id so the UI doesn't crash completely
     
     return ref_id
