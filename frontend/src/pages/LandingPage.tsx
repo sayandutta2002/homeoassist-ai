@@ -54,10 +54,10 @@ export default function LandingPage() {
                 <Bot className="w-5 h-5" />
                 Start AI Symptom Checker
               </Link>
-              <button className="border border-primary text-primary hover:bg-surface-container-low px-8 py-3 rounded-lg font-label-md text-label-md transition-colors flex items-center justify-center gap-2">
+              <Link to="/login?tab=doctor" className="border border-primary text-primary hover:bg-surface-container-low px-8 py-3 rounded-lg font-label-md text-label-md transition-colors flex items-center justify-center gap-2">
                 <Stethoscope className="w-5 h-5" />
                 Are you a Doctor? Join Practice
-              </button>
+              </Link>
             </div>
           </div>
           <div className="flex-1 relative w-full h-[500px] rounded-xl overflow-hidden shadow-lg border border-outline-variant">

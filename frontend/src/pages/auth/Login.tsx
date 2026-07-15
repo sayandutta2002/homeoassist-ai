@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Activity, Smartphone, Mail, Lock, LogIn, UserPlus, ShieldCheck, User } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'patient' | 'doctor'>('patient');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'patient' | 'doctor'>(
+    searchParams.get('tab') === 'doctor' ? 'doctor' : 'patient'
+  );
 
   // Patient State
   const [patientStep, setPatientStep] = useState<'phone' | 'otp' | 'register'>('phone');
@@ -50,7 +53,8 @@ export default function Login() {
           body: new URLSearchParams({ username: mobile, password: '' })
         });
         if (loginRes.ok) {
-          navigate('/dashboard'); // or wherever
+          localStorage.setItem('role', 'patient');
+          navigate('/triage'); // Redirect patient to triage for now
         } else {
           // If login fails, user might not be registered
           setPatientStep('register');
@@ -84,7 +88,8 @@ export default function Login() {
           body: new URLSearchParams({ username: mobile, password: '' })
         });
         if (loginRes.ok) {
-          navigate('/dashboard');
+          localStorage.setItem('role', 'patient');
+          navigate('/triage');
         } else {
           alert('Login failed after registration');
         }
@@ -105,7 +110,8 @@ export default function Login() {
         body: new URLSearchParams({ username: doctorEmail, password: doctorPassword })
       });
       if (res.ok) {
-        navigate('/dashboard');
+        localStorage.setItem('role', 'doctor');
+        navigate('/doctor/dashboard');
       } else {
         alert('Login failed');
       }

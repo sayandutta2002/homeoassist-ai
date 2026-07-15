@@ -31,7 +31,7 @@ async def chat_with_triage(request: TriageRequest):
         return triage_response.dict()
     except Exception as e:
         return {
-            "response": "I apologize, but I am experiencing technical difficulties. Please try again.",
+            "response": f"I apologize, but I am experiencing technical difficulties. Error: {str(e)}",
             "is_complete": False
         }
 

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Globe, Info, ChevronDown, Bot, UserCircle, Mic, Send, CheckCircle2
 } from 'lucide-react';
 
 export default function TriageChat() {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([
     { role: 'model', content: 'Hello, I am your HomeoAssist AI. Please describe your symptoms in detail...' }
   ]);
@@ -13,6 +14,14 @@ export default function TriageChat() {
   const [isComplete, setIsComplete] = useState(false);
   const [summary, setSummary] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Authentication Check
+  useEffect(() => {
+    const role = localStorage.getItem('role');
+    if (role !== 'patient') {
+        navigate('/login');
+    }
+  }, [navigate]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
